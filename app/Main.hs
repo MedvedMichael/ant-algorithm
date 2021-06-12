@@ -1,10 +1,15 @@
 module Main where
 
 import AntAlgorithm
-  ( AntAlgorithmField (AntAlgorithmField, bestPath, bestResult),
+  ( AntAlgorithmField (AntAlgorithmField, bestPath, bestResult, paths),
     Matrix,
+    allPossiblePaths,
+    calculatePathLength,
+    generateDistanceMatrix,
+    generateFeromonMatrix,
     getVisibilityMatrix,
-    iterateAntAlgorithm, showMatrix
+    iterateAntAlgorithm,
+    showMatrix, recalculateFeromonMatrix
   )
 import Data.List (drop, elem, findIndex, length, map, take)
 import Data.Maybe (Maybe (Just, Nothing), fromJust)
@@ -19,16 +24,6 @@ import System.IO
   )
 import Prelude
 
-generateDistanceMatrix :: Int -> IO Matrix
-generateDistanceMatrix num = generateDistanceMatrix' num num
-
-generateDistanceMatrix' :: Int -> Int -> IO Matrix
-generateDistanceMatrix' _ 0 = return []
-generateDistanceMatrix' num n = do
-  list <- randomList num (0, 100)
-  rs <- generateDistanceMatrix' num (n -1)
-  return (list : rs)
-
 splitOn :: Eq a => [a] -> [a] -> [[a]]
 splitOn arr delimiters =
   case findIndex (`elem` delimiters) arr of
@@ -41,16 +36,6 @@ getMatrix path = do
   contents <- hGetContents handle
   let lines = map (\a -> map (\a -> read a :: Float) (splitOn a " ")) (splitOn contents "\n")
   return lines
-
--- hClose handle
--- let matrix = splitOn Int ([a])
--- return contents
-
--- printMatrix :: IO()
--- printMatrix = do
---   let matrix = randomList 4
---   let str = intercalate "," (map (\a -> show =<< a) matrix)
---   print str
 
 initField :: Matrix -> [[Float]] -> Int -> IO AntAlgorithmField
 initField matrix startFeromonMatrix numberOfAnts = do
@@ -76,18 +61,25 @@ initField matrix startFeromonMatrix numberOfAnts = do
 
 main :: IO ()
 main = do
-  matrix <- getMatrix "files/matrix.txt"
-  startFeromonMatrix <- getMatrix "files/feromon-matrix.txt"
+  -- matrix <- getMatrix "files/matrix1.txt"
+  -- startFeromonMatrix <- getMatrix "files/feromon-matrix.txt"
+  let numberOfNodes = 20
+  matrix <- generateDistanceMatrix numberOfNodes
+  startFeromonMatrix <- generateFeromonMatrix numberOfNodes
+  let allPaths = allPossiblePaths matrix
+  let bestResultEver = minimum $ map (calculatePathLength matrix) allPaths
   print "Start matrix"
   showMatrix matrix
-  antField <- initField matrix startFeromonMatrix 3
+  -- ### Do to see the best path, very slow O(n!) ###
+  -- print "Best result ever"
+  -- print bestResultEver
+
+  antField <- initField matrix startFeromonMatrix 5
   print "First found path"
   print (map (+ 1) (fromJust $ bestPath antField))
   print $ bestResult antField
 
-  let newAntFields = iterate iterateAntAlgorithm antField 
-  let newAntField = newAntFields !! 10000
+  let newAntFields = iterate iterateAntAlgorithm antField
+  let newAntField = newAntFields !! 200000
   print (map (+ 1) (fromJust $ bestPath newAntField))
   print (bestResult newAntField)
-
---   print visibilityMatrix

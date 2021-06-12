@@ -1,17 +1,58 @@
-module AntAlgorithm
-where
+module AntAlgorithm where
+
+import Control.Monad (replicateM, unless)
 import Data.List
-import Data.Maybe
-import System.IO
+  ( drop,
+    elemIndex,
+    filter,
+    foldl,
+    head,
+    intercalate,
+    last,
+    length,
+    map,
+    notElem,
+    null,
+    tail,
+    take,
+    zip,
+    (!!),
+    (++),
+  )
+import Data.Maybe (Maybe (..), isNothing)
+import Random ( randomList )
+import System.IO (IO, print)
+import System.Random (Random (random, randomR), getStdGen, getStdRandom, randomRIO)
 import Prelude
-import Control.Monad ( unless )
 
 type Matrix = [[Float]]
 
-showMatrix :: Matrix -> IO()
+showMatrix :: Matrix -> IO ()
 showMatrix matrix =
   unless (null matrix) $ print (head matrix) >> showMatrix (tail matrix)
 
+replace :: [a] -> Int -> a -> [a]
+replace arr num target = take (num -1) arr ++ [target] ++ drop num arr
+
+generateDistanceMatrix :: Int -> IO Matrix
+generateDistanceMatrix num = generateDistanceMatrixRecurs num num
+
+generateDistanceMatrixRecurs :: Int -> Int -> IO Matrix
+generateDistanceMatrixRecurs _ 0 = return []
+generateDistanceMatrixRecurs num n = do
+  list <- randomList num (0, 100)
+  rs <- generateDistanceMatrixRecurs num (n -1)
+  return (replace list (num - n + 1) (-1) : rs)
+
+generateFeromonMatrix :: Int -> IO Matrix
+generateFeromonMatrix num = generateFeromonMatrixRecurs num num
+
+generateFeromonMatrixRecurs :: Int -> Int -> IO Matrix
+generateFeromonMatrixRecurs _ 0 = return []
+generateFeromonMatrixRecurs num n = do
+  list <- replicateM num $ randomRIO (0, 1.0)
+  rs <- generateFeromonMatrixRecurs num (n -1)
+  return (replace list (num - n + 1) 0 : rs)
 
 data AntAlgorithmField = AntAlgorithmField
   { distanceMatrix :: Matrix,
@@ -25,6 +66,15 @@ data AntAlgorithmField = AntAlgorithmField
     bestPath :: Maybe [Int],
     bestResult :: Maybe Float
   }
+
+allPossiblePaths :: Matrix -> [[Int]]
+allPossiblePaths matrix = map ([length matrix -1] ++) (allPossiblePathsRecurs (length matrix - 1) [])
+
+allPossiblePathsRecurs :: Int -> [Int] -> [[Int]]
+allPossiblePathsRecurs num path =
+  if length path == num
+    then [path]
+    else foldl (\res a -> res ++ allPossiblePathsRecurs num (path ++ [a])) [] (filter (`notElem` path) [0 .. (num -1)])
 
 getVisibilityMatrix :: Matrix -> Matrix
 getVisibilityMatrix = map (map (\a -> if a == -1 then 0 else 1 / a))
@@ -78,8 +128,8 @@ iterateAntAlgorithmRecurs field pathIndex =
                     ( path
                         ++ [ fst $
                                foldl
-                                 (\max a -> if snd a > snd max then a else max)
-                                 (-1, 0)
+                                 (\max a -> if snd a > snd max || isNaN (snd a) then a else max)
+                                 (-2, 0)
                                  (getPosibilities field path)
                            ]
                     )
@@ -102,7 +152,7 @@ includesInPath path a b =
 calculateAllPathLength :: AntAlgorithmField -> Int -> Float
 calculateAllPathLength (AntAlgorithmField distanceMatrix _ _ paths _ _ _ _ _ _) pathIndex =
   let path = paths !! pathIndex
-  in calculatePathLength distanceMatrix path
+   in calculatePathLength distanceMatrix path
 
 calculatePathLength :: Matrix -> [Int] -> Float
 calculatePathLength distanceMatrix path = calculatePathLengthRecurs path (head path) distanceMatrix 0
